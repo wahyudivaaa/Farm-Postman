@@ -102,6 +102,32 @@ GET  https://<workspace>.postman.co/_gw/config                  → agents + ful
 GET  https://<workspace>.postman.co/_gw/list-context-suggestions → AI-generated suggestions (LLM live)
 POST https://<workspace>.postman.co/_gw/chat?stream=false       → send chat message (SSE)
 
+# ~/_gw/chat — CORRECT body format (from RE; must use input.query + chatType, NOT message/userPrompt)
+{
+  "input": {
+    "chatType": "USER_QUERY",            # or "TOOL_RESPONSE"
+    "query": "your message",             # the prompt lives here!
+    "toolResponse": "",
+    "useCase": null,
+    "conversationId": null,              # set to continue a conversation
+    "agent": null,
+    "product": "workspace_v12",
+    "startedFrom": "CHAT_INPUT"
+  },
+  "platform": "WEB",
+  "clientTools": { "nativeToolsHash": "clienttools-workspace_v12-browser-<ver>-d5808662718f",
+                   "excludedTools": [...] },
+  "clientKBTerms": { "nativeTermsHash": "kbterms-workspace_v12-browser-<ver>-4755650f241c",
+                     "excludedKBTerms": ["DATASETS"] },
+  "mandatoryContext": { "workspaceId": "36274221" },
+  "selectedContext": [], "backgroundContext": [], "availableSkills": [],
+  "devModeOptions": { "selectedModel": "CLAUDE_OPUS_48_BEDROCK", "isParallelToolCallingSupported": true,
+                      "autoRun": false, "supportsAskUser": false, "supportsActionRecommendations": true,
+                      "useThinkingModeIfAvailable": true, "thinkingLevel": "low" }
+}
+# → SSE events: usage → streamingFormat → conversation → textChunk (model reply) → info(llm-call-stream-end)
+#   model used: global.anthropic.claude-sonnet-4-6 (default) etc.
+
 # /_gw request headers (exactly what the web UI sends — NO x-access-token needed)
 x-pstmn-req-service: agent-mode-service
 x-app-version: <product_version>
@@ -127,7 +153,10 @@ POST https://bifrost-https-v4.gw.postman.com/ws/proxy
 | `robust_full.py` | One-shot automated signup: temp-mail inbox → signup → Turnstile (headless) → OTP verify → workspace, dumps full session cookies. |
 | `part1_auth.py` | Step 1 — CloakBrowser auth → dump fresh cookies (no curl_cffi import to avoid greenlet collision). |
 | `part2_handshake.py` | Step 2 — `curl_cffi` handshake to get the runtime JWT from fresh cookies. |
-| `postman_proxy.py` | OpenAI-compatible gateway skeleton (`/v1/chat/completions` + `/v1/models`). |
+| `postman_proxy.py` | Legacy OpenAI-compatible gateway skeleton. |
+| `postman_gateway.py` | **Working** OpenAI-compatible gateway over Postman Agent Mode (`/v1/models`, `/v1/chat/completions`, streaming). |
+| `postman_ai_client.py` | Clean client wrapping `/ _gw` (conversation, config, suggestions, chat). |
+| `postman_cdp.py` | Attach to Postman Desktop via Chrome DevTools Protocol. |
 
 ### Setup
 
@@ -148,8 +177,9 @@ python part2_handshake.py robust_result.json
 #   → GET ra.gw.../handshake/token  → 200 { "token": "..." }
 
 # 5. Run the OpenAI-compatible proxy
-python postman_proxy.py --cookies robust_result.json --port 9120
-#   curl http://localhost:9120/v1/models
+python postman_gateway.py --cookies live_cookies.json --workspace https://<user>-<id>.postman.co --port 9121
+#   curl http://localhost:9121/v1/models
+#   curl http://localhost:9121/v1/chat/completions -d '{"model":"claude-opus-4-8","messages":[{"role":"user","content":"hi"}]}'
 ```
 
 ---
@@ -161,9 +191,10 @@ python postman_proxy.py --cookies robust_result.json --port 9120
 - [x] Access token via `iapub.postman.co/api/sessions/current`
 - [x] `/_gw` gateway open: conversation, config (premium models), AI suggestions live
 - [x] AI suggestions confirmed working on FREE user (LLM-generated)
-- [ ] Resolve `/chat` body format → full chat completions working
-- [ ] Wire the proxy to any OpenAI-compatible agent (OpenCode / Hermes / Cline)
-- [ ] Enterprise trial to unlock full Agent Mode
+- [x] **`/chat` working** — correct body (`input.query` + `chatType` + `clientTools`), all premium models reply (Claude Opus 4.8, GPT-5.6 Sol, ...) on FREE user
+- [x] **Working OpenAI-compatible gateway** (`postman_gateway.py`) verified: `/v1/models` + `/v1/chat/completions` + streaming
+- [ ] Wire to other agents (OpenCode / Hermes / Cline)
+- [ ] Enterprise trial for extended limits
 
 ---
 

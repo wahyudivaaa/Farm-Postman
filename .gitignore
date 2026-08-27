@@ -70,3 +70,5 @@ Thumbs.dbaccess_token.json
 bootstrap_captured.json
 gw_calls.json
 gw_hits.json
+test_chat_correct.py
+test_premium_models.py
