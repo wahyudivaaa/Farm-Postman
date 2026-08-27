@@ -78,3 +78,6 @@ server/data.db*
 server/node_modules/
 server/public/server.log
 access_token.json
+farm_out_*.json
+farm_results.json
+.omo/

@@ -55,6 +55,7 @@ if (!db.prepare("SELECT 1 FROM keys WHERE key=?").get(seedKey)) {
 // ---------------- helpers ----------------
 const json = (res, code, obj) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
 const body = (req) => new Promise((ok, no) => { let b = ""; req.on("data", c => { b += c; if (b.length > 5e6) req.destroy(); }); req.on("end", () => { try { ok(b ? JSON.parse(b) : {}); } catch { no(new Error("bad json")); } }); req.on("error", no); });
+const readRaw = (req) => new Promise((ok, no) => { let b = ""; req.on("data", c => { b += c; if (b.length > 5e6) req.destroy(); }); req.on("end", () => ok(b)); req.on("error", no); });
 
 // auth check
 function checkKey(req) {
@@ -144,17 +145,20 @@ function parseSSE(line, model) {
 }
 
 // ---------------- OpenAI chat handler ----------------
-async function handleChat(req, res, isStream) {
-  const b = await body(req);
+async function handleChatWithRaw(req, res, isStream, rawBody) {
+  let b; try { b = JSON.parse(rawBody || "{}"); } catch { return json(res, 400, { error: { message: "bad json" } }); }
+  return handleChatParsed(req, res, isStream, b);
+}
+async function handleChatParsed(req, res, isStream, b) {
   const model = b.model || "auto";
   const messages = b.messages || [];
-  const query = messages.length ? (messages[messages.length - 1].content || "") : "";
+  const query = messages.length ? String(messages[messages.length - 1].content || "") : "";
   const acc = pickAccount();
   if (!acc) return json(res, 503, { error: { message: "no active Postman account" } });
 
   const pmModel = postmanModelId(model);
-  // conversation recovery: keep a per-account conv id in memory for simplicity
-  const convId = acc.model_key !== model ? null : convState.get(acc.id) || null;
+  const convId = convState.get(acc.id) || null;
+  const includeUsage = b.stream_options?.include_usage === true;
 
   try {
     const up = await pmChat(acc, query, convId, pmModel, req.signal || undefined);
@@ -171,23 +175,29 @@ async function handleChat(req, res, isStream) {
         const obj = { id: cid, object: "chat.completion.chunk", model, choices: [{ index: 0, delta, finish_reason: fr }] };
         res.write("data: " + JSON.stringify(obj) + "\n\n");
       };
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const lines = (dec.decode(value, { stream: true })).split("\n");
-        for (const line of lines) {
-          const p = parseSSE(line, model);
-          if (!p) continue;
-          if (p.type === "content") { sendChunk({ content: p.text }); text += p.text; }
-          else if (p.type === "thinking") { sendChunk({ reasoning_content: p.text }); }
-          else if (p.type === "conversation") convIdNew = p.id;
-          else if (p.type === "usage") usageData = p.usage;
-          else if (p.type === "error") { err = p.error; sendChunk({ content: "" }, "stop"); }
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const lines = (dec.decode(value, { stream: true })).split("\n");
+          for (const line of lines) {
+            const p = parseSSE(line, model);
+            if (!p) continue;
+            if (p.type === "content") { sendChunk({ content: p.text }); text += p.text; }
+            else if (p.type === "thinking") { sendChunk({ reasoning_content: p.text }); }
+            else if (p.type === "conversation") convIdNew = p.id;
+            else if (p.type === "usage") usageData = p.usage;
+            else if (p.type === "error") { err = p.error; sendChunk({ content: "" }, "stop"); }
+          }
         }
-      }
+      } catch (e) { /* client aborted */ }
       sendChunk({}, "stop");
+      if (includeUsage) {
+        res.write("data: " + JSON.stringify({ id: cid, object: "chat.completion.chunk", model, choices: [], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: text.length } }) + "\n\n");
+      }
       res.write("data: [DONE]\n\n");
-      res.end();
+      if (typeof res.end === "function") { try { res.end(); } catch {} }
+      if (!res.writableEnded) { try { res.end(); } catch {} }
     } else {
       while (true) {
         const { done, value } = await reader.read();
@@ -334,7 +344,10 @@ const server = http.createServer(async (req, res) => {
     if (p === "/v1/chat/completions") {
       const key = checkKey(req);
       if (!key) return json(res, 401, { error: { message: "invalid api key" } });
-      return handleChat(req, res, (req.headers["accept"] || "").includes("text/event-stream"));
+      const rawBody = await readRaw(req);
+      console.log("[v1] model/body:", rawBody.slice(0, 400));
+      const isStream = (req.headers["accept"] || "").includes("text/event-stream");
+      return handleChatWithRaw(req, res, isStream, rawBody);
     }
     return json(res, 404, { error: { message: "not found" } });
   }

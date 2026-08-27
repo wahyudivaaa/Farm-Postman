@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 from common.browser import browser_kwargs
 
 EMAIL, USERNAME, PASSWORD = sys.argv[1], sys.argv[2], sys.argv[3]
+OUT_PATH = os.environ.get("FARM_OUT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "robust_result.json")
 MAIL_API = os.environ.get("MAIL_API", "https://mail.flashdev.org/api/public/v1")
 MAIL_KEY = os.environ.get("MAIL_API_KEY", "CHANGE_ME_cmf_v1_your_flashmail_key_here")
 
@@ -59,7 +60,7 @@ async def main():
                 if len(tok)>20: break
                 await asyncio.sleep(1)
             if len(tok)<=20:
-                out["status"]="no_signup_token"; json.dump(out,open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "robust_result.json"),"w")); return
+                out["status"]="no_signup_token"; json.dump(out,open(OUT_PATH,"w")); return
             await page.click("#sign-up-btn", timeout=15000); await asyncio.sleep(9)
 
             # poll code with retry
@@ -69,30 +70,45 @@ async def main():
                 if code: break
                 await asyncio.sleep(4)
 
-            # verify step with RETRY (up to 4 attempts)
+            # verify step with RETRY (up to 10 attempts — verify-account Turnstile is flaky)
             verified=False
-            for attempt in range(4):
+            for attempt in range(10):
                 if "verify-account" not in page.url:
                     verified=True; break
                 cur=page.url
-                # re-fill code (page may have reloaded)
+                # re-poll code (it may have just arrived)
+                if code is None:
+                    for _ in range(20):
+                        code=get_code()
+                        if code: break
+                        await asyncio.sleep(3)
                 await asyncio.sleep(2)
                 try:
-                    await page.locator("#verification-code").first.fill(code, timeout=6000)
+                    await page.locator("#verification-code").first.fill(code or "000000", timeout=6000)
                 except Exception:
                     await page.goto(cur, wait_until="domcontentloaded", timeout=45000); await asyncio.sleep(2)
-                    try: await page.locator("#verification-code").first.fill(code, timeout=6000)
+                    try: await page.locator("#verification-code").first.fill(code or "000000", timeout=6000)
                     except: pass
+                # ensure turnstile solved
                 await click_turnstile(page)
-                for _ in range(20):
+                for _ in range(25):
                     vtok=await page.evaluate(TOKEN_JS)
                     if len(vtok)>20: break
                     await asyncio.sleep(1)
+                # try submit via button AND Enter fallback
                 try: await page.click('button[type="submit"]', timeout=6000)
                 except: pass
-                await asyncio.sleep(7)
+                try:
+                    await page.keyboard.press("Enter")
+                except: pass
+                await asyncio.sleep(8)
                 if "verify-account" not in page.url:
                     verified=True; break
+                # if stuck after many attempts, reload page to reset turnstile state
+                if attempt in (3, 6):
+                    try: await page.reload(wait_until="domcontentloaded", timeout=30000)
+                    except: pass
+                    await asyncio.sleep(3)
             out["verify"]=verified
             print("[verify] passed:", verified, "url:", page.url[:120])
 
@@ -127,11 +143,11 @@ async def main():
                     pm[c["name"]]=c["value"]
             out["pm"]=pm
             out["status"]="verified_authed" if ("postman.iam.sid" in pm or "postman.sid" in pm and "onboarding" not in page.url) else "need_check"
-            json.dump(out, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "robust_result.json"),"w"), indent=1)
+            json.dump(out, open(OUT_PATH,"w"), indent=1)
             print("session keys:", list(pm.keys())[:15])
             print("STATUS:", out["status"])
         except Exception as e:
-            out["error"]=str(e); json.dump(out,open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "robust_result.json"),"w"))
+            out["error"]=str(e); json.dump(out,open(OUT_PATH,"w"))
             print("ERR:", str(e)[:200])
         finally:
             try: await browser.close()
