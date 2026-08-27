@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Postman2API — Dashboard</title>
+<link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">Postman<span>2API</span></div>
+    <nav>
+      <button class="nav-item active" data-page="dashboard">📊 Dashboard</button>
+      <button class="nav-item" data-page="accounts">👤 Accounts</button>
+      <button class="nav-item" data-page="keys">🔑 API Keys</button>
+      <button class="nav-item" data-page="usage">📈 Usage</button>
+      <button class="nav-item" data-page="models">🤖 Models</button>
+      <button class="nav-item" data-page="settings">⚙️ Settings</button>
+    </nav>
+    <div class="status-box">
+      <div class="dot" id="healthDot"></div>
+      <span id="healthText">checking…</span>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><h1 id="pageTitle">Dashboard</h1><div class="api-base">API: <code>http://localhost:9121/v1</code></div></header>
+    <div id="page"></div>
+  </main>
+</div>
+<script src="/public/app.js"></script>
+</body>
+</html>

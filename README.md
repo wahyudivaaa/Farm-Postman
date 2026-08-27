@@ -157,6 +157,7 @@ POST https://bifrost-https-v4.gw.postman.com/ws/proxy
 | `postman_gateway.py` | **Working** OpenAI-compatible gateway over Postman Agent Mode (`/v1/models`, `/v1/chat/completions`, streaming). |
 | `postman_ai_client.py` | Clean client wrapping `/ _gw` (conversation, config, suggestions, chat). |
 | `postman_cdp.py` | Attach to Postman Desktop via Chrome DevTools Protocol. |
+| `server/` | **Full web dashboard + multi-account gateway** (Node + SQLite), mirrors the well-known freebuff2api layout: OpenAI/Anthropic compatible `/v1/*`, account pool, API-key auth, usage tracking, conversation recovery, live dashboard. |
 
 ### Setup
 
@@ -180,6 +181,12 @@ python part2_handshake.py robust_result.json
 python postman_gateway.py --cookies live_cookies.json --workspace https://<user>-<id>.postman.co --port 9121
 #   curl http://localhost:9121/v1/models
 #   curl http://localhost:9121/v1/chat/completions -d '{"model":"claude-opus-4-8","messages":[{"role":"user","content":"hi"}]}'
+
+# 6. (Or) run the full web dashboard + multi-account gateway (Node)
+cd server && npm install && node server.js
+#   open http://localhost:9121  → dashboard
+#   curl http://localhost:9121/v1/chat/completions -H "Authorization: Bearer postman-default-key" \
+#        -d '{"model":"gpt-5.6-sol","messages":[{"role":"user","content":"hi"}]}'
 ```
 
 ---

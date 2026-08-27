@@ -72,3 +72,9 @@ gw_calls.json
 gw_hits.json
 test_chat_correct.py
 test_premium_models.py
+
+# server
+server/data.db*
+server/node_modules/
+server/public/server.log
+access_token.json

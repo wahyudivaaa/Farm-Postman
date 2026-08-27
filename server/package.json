@@ -1,0 +1,17 @@
+{
+  "name": "postman2api-web",
+  "version": "2.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Postman Agent Mode free models → OpenAI/Anthropic compatible API with multi-account pool, conversation recovery, usage tracking and dashboard",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "undici": "^6.21.0"
+  }
+}
