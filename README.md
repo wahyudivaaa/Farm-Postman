@@ -72,6 +72,9 @@ The AI gateway session is established through this chain:
 
 ## 🧭 Endpoints Discovered (RE)
 
+### Desktop App (CDP-driven)
+Postman Desktop (Electron, `Postman.exe`) can be driven via `--remote-debugging-port`; app UI is the `scratchpad.html` bundle. Desktop login uses a **browser authorization-token flow** (`identity.getpostman.com/client/browser-auth/init`). Agent Mode chat is gatewayed through the same `/_gw` as the web app.
+
 ### Signup / Identity
 ```
 POST https://identity.getpostman.com/signup
