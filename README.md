@@ -27,8 +27,8 @@ This project documents a full deep-dive into **Postman's AI infrastructure**: ho
 
 ```
 ┌──────────────┐     turnstile (headless)     ┌──────────────────────────────┐
-│ FlashMail    │ ───────────────────────────▶ │    Postman Signup Flow       │
-│ (temp inbox) │                              │  identity.getpostman.com     │
+│ temp / mail  │ ───────────────────────────▶ │    Postman Signup Flow       │
+│ inbox (API)  │                              │  identity.getpostman.com     │
 └──────────────┘                              └──────────────┬───────────────┘
                                                             │ verify email (OTP)
                                                             ▼
@@ -87,25 +87,23 @@ POST https://identity.getpostman.com/login
 GET  https://ra.gw.postman.com/v1/handshake/token?agent=CLOUD|WS   → runtime JWT
 GET  https://runtime-agent.getpostman.com/v1/handshake/token?agent=CLOUD|WS
 
-POST https://<workspace>.postman.co/_api/ws/proxy
-  Body: { "service":"ai", "method":"GET", "path":"/ai/user-settings" }   ✅ LIVE (200, feature flags)
+# ⭐ Access token for Agent Mode /_gw gateway (from app session)
+GET  https://iapub.postman.co/api/sessions/current
+     → session.token (64-char access token)
 
-POST https://<workspace>.postman.co/_api/ws/proxy
-  Body: {
-    "service":"ai","method":"POST",
-    "path":"/ai/postbot/request/completions",
-    "body":{
-      "configs":{ "intellisense":{ "components":["PARAMS","HEADERS","BODY"] } },
-      "messages":[{ "role":"user", "content":"..." }],
-      "model":"gpt-5.6-sol"
-    }
-  }
+# ~/_gw — the real Agent Mode gateway (web + desktop runtime)
+POST https://<workspace>.postman.co/_gw/conversation            → create chat conversation
+GET  https://<workspace>.postman.co/_gw/conversation            → list conversations
+GET  https://<workspace>.postman.co/_gw/conversation/<id>       → conversation detail
+GET  https://<workspace>.postman.co/_gw/config                  → agents + full premium model list
+GET  https://<workspace>.postman.co/_gw/list-context-suggestions → AI-generated suggestions (LLM live)
+POST https://<workspace>.postman.co/_gw/chat?stream=false       → send chat message (SSE)
 
-POST https://<workspace>.postman.co/_api/ws/proxy
-  Body: { "service":"ai","method":"POST","path":"/ai/postbot/request/completions/{id}/accept", ... }  (stream)
-
-POST https://orion-http.gw.postman.co/v1/request      (Agent Mode runtime; auth: Bearer <runtime token>)
-WS   wss://cloud-agent.gw.postman.com/ws              (Agent Mode WebSocket)
+# /_gw request headers (exactly what the web UI sends — NO x-access-token needed)
+x-pstmn-req-service: agent-mode-service
+x-app-version: <product_version>
+Content-Type: application/json
++ session cookies (credentials: include)
 ```
 
 ### Public gateway (bifrost)
@@ -123,7 +121,7 @@ POST https://bifrost-https-v4.gw.postman.com/ws/proxy
 
 | Script | Purpose |
 |--------|---------|
-| `robust_full.py` | One-shot automated signup: FlashMail inbox → signup → Turnstile (headless) → OTP verify → workspace, dumps full session cookies. |
+| `robust_full.py` | One-shot automated signup: temp-mail inbox → signup → Turnstile (headless) → OTP verify → workspace, dumps full session cookies. |
 | `part1_auth.py` | Step 1 — CloakBrowser auth → dump fresh cookies (no curl_cffi import to avoid greenlet collision). |
 | `part2_handshake.py` | Step 2 — `curl_cffi` handshake to get the runtime JWT from fresh cookies. |
 | `postman_proxy.py` | OpenAI-compatible gateway skeleton (`/v1/chat/completions` + `/v1/models`). |
@@ -134,9 +132,9 @@ POST https://bifrost-https-v4.gw.postman.com/ws/proxy
 # 1. Dependencies
 pip install curl_cffi cloakbrowser    # + local captcha-solver (Turnstile) at ./captcha-solver
 
-# 2. Configure FlashMail credentials (disposable inbox API)
-export MAIL_API="https://mail.flashdev.org/api/public/v1"
-export MAIL_API_KEY="cmf_v1_your_key_here"
+# 2. Configure disposable-mail credentials (temp-mail API of your choice)
+export MAIL_API="https://your-temp-mail-api.example/v1"
+export MAIL_API_KEY="your_key_here"
 
 # 3. Farm a session
 python robust_full.py  user@temp.com  username  'Password!123'
@@ -157,10 +155,12 @@ python postman_proxy.py --cookies robust_result.json --port 9120
 
 - [x] Full automated account signup + verification (headless, free Turnstile solver)
 - [x] Runtime agent handshake token (ra.gw / runtime-agent)
-- [x] Confirmed live `service:ai` endpoints (`/ai/user-settings`)
-- [x] `configs.intellisense.components` validation chain (PARAMS/HEADERS/BODY)
-- [ ] Resolve final `context` field → make Postbot completions return real model output
+- [x] Access token via `iapub.postman.co/api/sessions/current`
+- [x] `/_gw` gateway open: conversation, config (premium models), AI suggestions live
+- [x] AI suggestions confirmed working on FREE user (LLM-generated)
+- [ ] Resolve `/chat` body format → full chat completions working
 - [ ] Wire the proxy to any OpenAI-compatible agent (OpenCode / Hermes / Cline)
+- [ ] Enterprise trial to unlock full Agent Mode
 
 ---
 

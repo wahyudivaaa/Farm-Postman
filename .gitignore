@@ -66,4 +66,7 @@ bundles/
 
 # ========== OS ==========
 .DS_Store
-Thumbs.db
+Thumbs.dbaccess_token.json
+bootstrap_captured.json
+gw_calls.json
+gw_hits.json
