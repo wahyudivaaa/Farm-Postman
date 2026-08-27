@@ -1,0 +1,69 @@
+# ========== CREDENTIALS & SESSIONS — JANGAN PERNAH COMMIT ==========
+# Akun & password hasil farming
+accounts.json
+last_account.json
+account_session.json
+all_cookies.json
+live_cookies.json
+fresh_cookies.json
+runtime_token.json
+end_session.json
+session_cookies.json
+handshake_result.json
+
+# Semua hasil JSON debug (bisa berisi token/cookie/session)
+*_result.json
+*_results.json
+det_result.json
+ggl_oauth_result*.json
+cb_*_result.json
+cb_init_oauth.json
+cb_direct_result.json
+cb_oauth_result.json
+native_result.json
+native_fetch_result.json
+oneshot*.json
+robust_result.json
+rocket_result.json
+god_ai_api.json
+god_me.json
+hs2.json
+hs_auth_tests.json
+intercepted.json
+internal_api.json
+end_ai_endpoints.json
+final_agent.json
+agent_live.json
+login_live.json
+agent_bundle.json
+ws_proxy_capture.json
+postbot_trigger.json
+signup_response.json
+
+# Token & page dumps
+headed_token.txt
+turnstile_token.txt
+local_token*.json
+ck_*.txt
+ckx.txt
+
+# HTML debug (bisa berisi csrf/auth token) + folder debug lokal
+*.html
+debug/
+!recon/README.md
+
+# Cookies
+*.sails.sid
+
+# ========== BUILD / DEP / PYTHON ==========
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+bundles/
+*.log
+
+# ========== OS ==========
+.DS_Store
+Thumbs.db

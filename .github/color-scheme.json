@@ -1,0 +1,16 @@
+{
+  "colorScheme": {
+    "brand": "#FF6C37",
+    "bg": "#0B0B0F",
+    "bgAlt": "#131318",
+    "card": "#17171C",
+    "border": "#232329",
+    "text": "#EDEDEF",
+    "textMuted": "#9A9AA5",
+    "accent": "#FF6C37",
+    "accentDim": "#FF8F5E",
+    "success": "#3DDC97",
+    "warning": "#F5B942",
+    "danger": "#FF5C5C"
+  }
+}
